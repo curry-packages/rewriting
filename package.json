@@ -13,13 +13,16 @@
        A previous version of these libraries were part of the
        PAKCS/KiCS2 distributions.",
     "category": [ "Rewriting", "Narrowing" ],
-  "dependencies": {
-  },
-    "exportedModules":
-    [ "Rewriting.CriticalPairs", "Rewriting.Narrowing", "Rewriting.Strategy",
-      "Rewriting.Unification", "Rewriting.DefinitionalTree",
-      "Rewriting.Position", "Rewriting.Substitution",
-      "Rewriting.UnificationSpec", "Rewriting.Files",
-      "Rewriting.Rules", "Rewriting.Term"
-    ]
-}
+    "dependencies": { },
+    "exportedModules": [
+        "Rewriting.CriticalPairs", "Rewriting.Narrowing", "Rewriting.Strategy",
+        "Rewriting.Unification", "Rewriting.DefinitionalTree",
+        "Rewriting.Position", "Rewriting.Substitution",
+        "Rewriting.UnificationSpec", "Rewriting.Files",
+        "Rewriting.Rules", "Rewriting.Term"
+    ],
+    "source": {
+        "git": "https://git.ps.informatik.uni-kiel.de/curry-packages/rewriting.git",
+        "tag": "$version"
+    }
+ }
