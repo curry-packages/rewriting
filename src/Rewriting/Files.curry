@@ -16,7 +16,7 @@ module Rewriting.Files
 
 import AbstractCurry.Files (tryReadCurryFile)
 import AbstractCurry.Types
-import FiniteMap (FM, listToFM)
+import qualified Data.Map as Map
 import Rewriting.Rules (Rule, TRS, rCons)
 import Rewriting.Substitution
 import Rewriting.Term (Term (..), tConst)
@@ -28,7 +28,7 @@ import Rewriting.Term (Term (..), tConst)
 --- Mappings from a function name to the corresponding term rewriting system
 --- represented as a finite map from qualified names to term rewriting
 --- systems.
-type TRSData = FM QName (TRS QName)
+type TRSData = Map.Map QName (TRS QName)
 
 --- Information about types represented as a list of type declarations.
 type TypeData = [CTypeDecl]
@@ -80,7 +80,7 @@ readCurryProgram fn = do res <- tryReadCurryFile fn
 --- and every type has a corresponding type declaration.
 fromCurryProg :: CurryProg -> RWData
 fromCurryProg (CurryProg _ _ _ _ _ ts fs _)
-  = (listToFM (<) (map fromFuncDecl fs), ts)
+  = (Map.fromList (map fromFuncDecl fs), ts)
 
 --- Transforms an abstract curry function declaration into a pair with
 --- function name and corresponding term rewriting system.

@@ -14,7 +14,7 @@ module Rewriting.Position
   , positions, (.>), (|>), replaceTerm
   ) where
 
-import List (intercalate, isPrefixOf)
+import Data.List (intercalate, isPrefixOf)
 import Rewriting.Term (Term (..))
 
 -- ---------------------------------------------------------------------------

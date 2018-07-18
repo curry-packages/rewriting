@@ -13,16 +13,17 @@ module Rewriting.DefinitionalTree
   , defTrees, defTreesL, loDefTrees, phiRStrategy, dotifyDefTree, writeDefTree
   ) where
 
-import Function (on, both)
-import List
-import Maybe (listToMaybe, catMaybes)
+import Data.Function    (on)
+import Data.Tuple.Extra (both)
+import Data.List
+import Data.Maybe       (listToMaybe, catMaybes)
 import Rewriting.Position (Pos, eps, positions, (.>), (|>), replaceTerm)
 import Rewriting.Rules
 import Rewriting.Strategy (RStrategy)
 import Rewriting.Substitution (applySubst)
 import Rewriting.Term
 import Rewriting.Unification (unify, unifiable)
-import State
+import Control.Monad.Trans.State
 
 -- ---------------------------------------------------------------------------
 -- Representation of definitional trees
@@ -245,29 +246,29 @@ toGraph dt = fst (fst (runState (toGraph' dt) 0))
   where
     toGraph' :: DefTree f -> State Int (Graph f, Node f)
     toGraph' (Leaf (l, r))
-      = newIdx `bindS`
+      = newIdx >>=
           (\i -> let n = (i, Nothing, l)
-                  in (mapS (ruleEdge n) [r]) `bindS` (addNode n))
+                  in (mapM (ruleEdge n) [r]) >>= (addNode n))
     toGraph' (Branch pat p dts)
-      = newIdx `bindS`
+      = newIdx >>=
           (\i -> let n = (i, Just p, pat)
-                  in (mapS (branchEdge n) dts) `bindS` (addNode n))
+                  in (mapM (branchEdge n) dts) >>= (addNode n))
     toGraph' (Or pat dts)
-      = newIdx `bindS`
+      = newIdx >>=
           (\i -> let n = (i, Nothing, pat)
-                  in (mapS (branchEdge n) dts) `bindS` (addNode n))
+                  in (mapM (branchEdge n) dts) >>= (addNode n))
     addNode :: Node f -> [Graph f] -> State Int (Graph f, Node f)
     addNode n gs = let (ns, es) = unzip gs
-                    in returnS ((n:(concat ns), concat es), n)
+                    in return ((n:(concat ns), concat es), n)
     branchEdge :: Node f -> DefTree f -> State Int (Graph f)
     branchEdge n1 dt'
-      = (toGraph' dt') `bindS`
-          (\((ns, es), n2) -> returnS (ns, (False, n1, n2):es))
+      = (toGraph' dt') >>=
+          (\((ns, es), n2) -> return (ns, (False, n1, n2):es))
     ruleEdge :: Node f -> Term f -> State Int (Graph f)
-    ruleEdge n1 t = newIdx `bindS` (\i -> let n = (i, Nothing, t)
-                                           in returnS ([n], [(True, n1, n)]))
+    ruleEdge n1 t = newIdx >>= (\i -> let n = (i, Nothing, t)
+                                      in return ([n], [(True, n1, n)]))
     newIdx :: State Int Int
-    newIdx = getS `bindS` (\i -> (putS (i + 1)) `bindS_` (returnS i))
+    newIdx = modify (+1) >> get
 
 --- Transforms a term into a string representation and surrounds the subterm
 --- at the given position with the html `<u>` and `</u>` tags.

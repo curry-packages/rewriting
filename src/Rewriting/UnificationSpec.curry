@@ -16,8 +16,8 @@ module Rewriting.UnificationSpec
   , showUnificationError, unify, unifiable
   ) where
 
-import Either (isRight)
-import Function (both)
+import Data.Either            (isRight)
+import Data.Tuple.Extra       (both)
 import Rewriting.Substitution (Subst, emptySubst, extendSubst)
 import Rewriting.Term
 

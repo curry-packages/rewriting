@@ -14,9 +14,10 @@ module Rewriting.Rules
   , isConsBased, isDemandedAt
   ) where
 
-import Function (on, both)
-import List (union, maximum, minimum)
-import Maybe (mapMaybe)
+import Data.Function    (on)
+import Data.Tuple.Extra (both)
+import Data.List        (union, maximum, minimum)
+import Data.Maybe       (mapMaybe)
 import Rewriting.Substitution (listToSubst, applySubst)
 import Rewriting.Term
 

@@ -15,7 +15,7 @@ module Rewriting.Strategy
   , reductionBy, reductionByL
   ) where
 
-import List (nub, intercalate, groupBy, sortBy, minimumBy)
+import Data.List (nub, intercalate, groupBy, sortBy, minimumBy)
 import Rewriting.Position
 import Rewriting.Rules (TRS, renameRuleVars, renameTRSVars)
 import Rewriting.Substitution (applySubst)

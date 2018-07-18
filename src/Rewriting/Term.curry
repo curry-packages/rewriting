@@ -18,9 +18,9 @@ module Rewriting.Term
   , mapTerm, eqConsPattern
   ) where
 
-import FiniteMap (listToFM, lookupFM)
-import List (nub, intercalate, maximum, minimum)
-import Maybe (fromMaybe)
+import qualified Data.Map as Map
+import Data.List  (nub, intercalate, maximum, minimum)
+import Data.Maybe (fromMaybe)
 
 -- ---------------------------------------------------------------------------
 -- Representation of first-order terms and term equations
@@ -160,9 +160,9 @@ minVarInTerm t = case tVars t of
 normalizeTerm :: Term f -> Term f
 normalizeTerm t = normalize t
   where
-    sub = listToFM (<) (zip (tVars t) (map TermVar [0..]))
+    sub = Map.fromList (zip (tVars t) (map TermVar [0..]))
 
-    normalize t'@(TermVar v)  = fromMaybe t' (lookupFM sub v)
+    normalize t'@(TermVar v)  = fromMaybe t' (Map.lookup v sub)
     normalize (TermCons c ts) = TermCons c (map normalize ts)
 
 --- Renames the variables in a term by the given number.

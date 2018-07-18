@@ -11,7 +11,7 @@ module Rewriting.CriticalPairs
   , showCPair, showCPairs, cPairs, isOrthogonal, isWeakOrthogonal
   ) where
 
-import List (nub)
+import Data.List (nub)
 import Rewriting.Position (eps, positions, (|>), replaceTerm)
 import Rewriting.Rules
 import Rewriting.Substitution (applySubst)

@@ -15,9 +15,9 @@ module Rewriting.Narrowing
   , dotifyNarrowingTree, writeNarrowingTree
   ) where
 
-import FiniteMap (eltsFM)
-import Maybe (fromMaybe, mapMaybe)
-import List (maximum)
+import qualified Data.Map as Map
+import Data.Maybe (fromMaybe, mapMaybe)
+import Data.List  (maximum)
 import Rewriting.DefinitionalTree
 import Rewriting.Position
 import Rewriting.Rules
@@ -25,7 +25,7 @@ import Rewriting.Strategy (RStrategy, poRStrategy, reduce)
 import Rewriting.Substitution
 import Rewriting.Term
 import Rewriting.Unification (UnificationError (..), unify, unifiable)
-import State
+import Control.Monad.Trans.State
 
 -- ---------------------------------------------------------------------------
 -- Representation of narrowing strategies
@@ -207,7 +207,7 @@ narrowBy' v sub s trs n t
     combine (p, (_, r), sub')
       = let t' = applySubst sub' (replaceTerm t p r)
             rsub' = restrictSubst sub' (tVars t)
-            v' = case mapMaybe maxVarInTerm (eltsFM rsub') of
+            v' = case mapMaybe maxVarInTerm (Map.elems rsub') of
                    []       -> v
                    vs@(_:_) -> (maximum vs) + 1
          in narrowBy' v' (composeSubst rsub' sub) s trs (n - 1) t'
@@ -240,7 +240,7 @@ narrowingBy' v sub s trs n t
       = let t' = applySubst sub' (replaceTerm t p r)
             rsub' = restrictSubst sub' (tVars t)
             phi = composeSubst rsub' sub
-            v' = case mapMaybe maxVarInTerm (eltsFM rsub') of
+            v' = case mapMaybe maxVarInTerm (Map.elems rsub') of
                    []       -> v
                    vs@(_:_) -> (maximum vs) + 1
          in map (NStep t p phi) (narrowingBy' v' phi s trs (n - 1) t')
@@ -274,7 +274,7 @@ narrowingTreeBy' v sub s trs n t
       = let t' = applySubst sub' (replaceTerm t p r)
             rsub' = restrictSubst sub' (tVars t)
             phi = composeSubst rsub' sub
-            v' = case mapMaybe maxVarInTerm (eltsFM rsub') of
+            v' = case mapMaybe maxVarInTerm (Map.elems rsub') of
                    []       -> v
                    vs@(_:_) -> (maximum vs) + 1
          in (p, phi, narrowingTreeBy' v' phi s trs (n - 1) t')
@@ -330,7 +330,7 @@ solveEq' opts v sub s trs t@(TermCons _ ts)
     solve (p, (_, r'), sub')
       = let t' = applySubst sub' (replaceTerm nt p r')
             rsub' = restrictSubst sub' (tVars nt)
-            v' = case mapMaybe maxVarInTerm (eltsFM rsub') of
+            v' = case mapMaybe maxVarInTerm (Map.elems rsub') of
                    []       -> v
                    vs@(_:_) -> (maximum vs) + 1
          in solveEq' opts v' (composeSubst rsub' sub) s trs t'
@@ -357,17 +357,17 @@ toGraph ng = fst (fst (runState (toGraph' ng) 0))
   where
     toGraph' :: NarrowingTree f -> State Int (Graph f, Node f)
     toGraph' (NTree t ngs)
-      = newIdx `bindS`
+      = newIdx >>=
           (\i -> let n = (i, t)
-                  in (mapS (edge n) ngs) `bindS`
+                  in (mapM (edge n) ngs) >>=
                        (\gs -> let (ns, es) = unzip gs
-                                in returnS ((n:(concat ns), concat es), n)))
+                                in return ((n:(concat ns), concat es), n)))
     edge :: Node f -> (Pos, Subst f, NarrowingTree f) -> State Int (Graph f)
     edge n1 (_, sub, ng')
-      = (toGraph' ng') `bindS`
-          (\((ns, es), n2) -> returnS (ns, (n1, sub, n2):es))
+      = (toGraph' ng') >>=
+          (\((ns, es), n2) -> return (ns, (n1, sub, n2):es))
     newIdx :: State Int Int
-    newIdx = getS `bindS` (\i -> (putS (i + 1)) `bindS_` (returnS i))
+    newIdx = modify (+1) >> get
 
 --- Transforms a narrowing tree into a graphical representation by using the
 --- *DOT graph description language*.
