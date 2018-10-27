@@ -14,7 +14,8 @@
        PAKCS/KiCS2 distributions.",
     "category": [ "Rewriting", "Narrowing" ],
     "dependencies": {
-        "abstract-curry": ">= 3.0.0"
+        "abstract-curry": ">= 3.0.0",
+        "base"          : ">= 2.0.0"
     },
     "compilerCompatibility": {
         "pakcs": ">= 2.0.0",
