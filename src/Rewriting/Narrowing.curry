@@ -15,9 +15,10 @@ module Rewriting.Narrowing
   , dotifyNarrowingTree, writeNarrowingTree
   ) where
 
-import FiniteMap (eltsFM)
 import Maybe (fromMaybe, mapMaybe)
 import List (maximum)
+
+import Data.FiniteMap (eltsFM)
 import Rewriting.DefinitionalTree
 import Rewriting.Position
 import Rewriting.Rules

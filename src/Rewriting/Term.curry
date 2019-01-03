@@ -19,9 +19,10 @@ module Rewriting.Term
   ) where
 
 import Char      ( isAlphaNum )
-import FiniteMap ( listToFM, lookupFM )
 import List      ( nub, intercalate, maximum, minimum )
 import Maybe     ( fromMaybe )
+
+import Data.FiniteMap ( listToFM, lookupFM )
 
 -- ---------------------------------------------------------------------------
 -- Representation of first-order terms and term equations

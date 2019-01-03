@@ -15,8 +15,9 @@ module Rewriting.Unification
   ) where
 
 import Either (isRight)
-import FiniteMap (FM, emptyFM, addToFM, lookupFM)
 import List (mapAccumL)
+
+import Data.FiniteMap (FM, emptyFM, addToFM, lookupFM)
 import Rewriting.Substitution (Subst, emptySubst, extendSubst)
 import Rewriting.Term (VarIdx, Term (..), TermEq, TermEqs)
 import Rewriting.UnificationSpec (UnificationError (..), showUnificationError)
