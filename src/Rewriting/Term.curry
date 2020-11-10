@@ -63,13 +63,17 @@ showTerm :: (f -> String) -> Term f -> String
 showTerm s = showTerm' False
   where
     showTerm' _ (TermVar v)     = showVarIdx v
-    showTerm' b (TermCons c ts)
-      = case ts of
-          []     -> s c
-          [l, r] -> parensIf b ((showTerm' True l) ++ " " ++ (s c) ++ " "
-                      ++ (showTerm' True r))
-          _      -> (s c) ++ "("
-                      ++ (intercalate "," (map (showTerm' False) ts)) ++ ")"
+    showTerm' b (TermCons c ts) = case ts of
+      []     -> cstr
+      [l, r] -> if any isAlphaNum cstr
+                  then prefixString -- no infix notation
+                  else parensIf b (showTerm' True l ++ " " ++ cstr ++ " " ++
+                                   showTerm' True r)
+      _      -> prefixString
+     where
+      cstr         = s c
+      prefixString = cstr ++ "("
+                          ++ intercalate "," (map (showTerm' False) ts) ++ ")"
 
 --- Transforms a term equation into a string representation.
 showTermEq :: (f -> String) -> TermEq f -> String
