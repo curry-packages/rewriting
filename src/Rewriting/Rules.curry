@@ -140,5 +140,5 @@ isConsBased trs = all ((isPattern trs) . fst) trs
 --- `True` if the corresponding argument term is a constructor term.
 isDemandedAt :: Int -> Rule _ -> Bool
 isDemandedAt _ (TermVar _, _)     = False
-isDemandedAt i (TermCons _ ts, _) = (i > 0) && (i <= (length ts))
-                                      && (isConsTerm (ts !! (i - 1)))
+isDemandedAt i (TermCons _ ts, _) =
+  i > 0 && i <= length ts && isConsTerm (ts !! (i - 1))

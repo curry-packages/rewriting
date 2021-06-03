@@ -85,10 +85,10 @@ defaultNOptions = NOptions { normalize = False, rStrategy = poRStrategy }
 --- Transforms a narrowing into a string representation.
 showNarrowing :: (f -> String) -> Narrowing f -> String
 showNarrowing s (NTerm t)         = showTerm s t
-showNarrowing s (NStep t p sub n)
-  = (showTerm s t) ++ "\n\x2192" ++ "[" ++ (showPos p) ++ ", "
-      ++ (showSubst s (restrictSubst sub (tVars t))) ++ "] "
-      ++ (showNarrowing s n)
+showNarrowing s (NStep t p sub n) =
+  showTerm s t ++ "\n\x2192" ++ "[" ++ showPos p ++ ", "
+               ++ showSubst s (restrictSubst sub (tVars t)) ++ "] "
+               ++ showNarrowing s n
 
 -- ---------------------------------------------------------------------------
 -- Definition of common narrowing strategies
@@ -96,17 +96,17 @@ showNarrowing s (NStep t p sub n)
 
 --- The standard narrowing strategy.
 stdNStrategy :: Eq f => NStrategy f
-stdNStrategy trs t = [(p, rule, sub) |
-                      p <- positions t, let tp = t |> p, isConsTerm tp,
-                      rule@(l, _) <- trs,
-                      (Right sub) <- [unify [(tp, l)]]]
+stdNStrategy trs t = [(p, rule, sub) | p <- positions t,
+                                       let tp = t |> p, isConsTerm tp,
+                                       rule@(l, _) <- trs,
+                                       Right sub <- [unify [(tp, l)]]]
 
 --- The innermost narrowing strategy.
 imNStrategy :: Eq f => NStrategy f
-imNStrategy trs t = [(p, rule, sub) |
-                     p <- positions t, let tp = t |> p, isPattern trs tp,
-                     rule@(l, _) <- trs,
-                     (Right sub) <- [unify [(tp, l)]]]
+imNStrategy trs t = [(p, rule, sub) | p <- positions t,
+                                      let tp = t |> p, isPattern trs tp,
+                                      rule@(l, _) <- trs,
+                                      Right sub <- [unify [(tp, l)]]]
 
 --- The outermost narrowing strategy.
 omNStrategy :: Eq f => NStrategy f
@@ -117,17 +117,16 @@ omNStrategy trs t = let ns = stdNStrategy trs t
 
 --- The leftmost outermost narrowing strategy.
 loNStrategy :: Eq f => NStrategy f
-loNStrategy trs t
-  = let ns = stdNStrategy trs t
-     in [n | n@(p, _, _) <- ns,
-             all (\p' -> not ((above p' p) || (leftOf p' p)))
-                 [p' | (p', _, _) <- ns, p' /= p]]
+loNStrategy trs t =
+  let ns = stdNStrategy trs t
+   in [n | n@(p, _, _) <- ns,
+           all (\p' -> not (above p' p || leftOf p' p))
+               [p' | (p', _, _) <- ns, p' /= p]]
 
 --- The lazy narrowing strategy.
 lazyNStrategy :: Eq f => NStrategy f
-lazyNStrategy trs t
-  = let lps = lazyPositions trs t
-     in filter (\(p, _, _) -> elem p lps) (stdNStrategy trs t)
+lazyNStrategy trs t = let lps = lazyPositions trs t
+                       in filter (\(p, _, _) -> elem p lps) (stdNStrategy trs t)
 
 --- Returns a list of all lazy positions in a term according to the given term
 --- rewriting system.
@@ -137,41 +136,41 @@ lazyPositions trs t@(TermCons _ ts)
   | isRedex trs t = if null rs then lps else eps:lps
   | otherwise     = [i:p | (i, t') <- zip [1..] ts, p <- lazyPositions trs t']
   where
-    ftrs = filter ((eqConsPattern t) . fst) trs
+    ftrs = filter (eqConsPattern t . fst) trs
     rs = [r | r@(l, _) <- ftrs, unifiable [(t, l)]]
     dps = [i | (i, _) <- zip [1..] ts, any (isDemandedAt i) ftrs]
     lps = [i:p | i <- dps, p <- lazyPositions trs (ts !! (i - 1))]
 
 --- The weakly needed narrowing strategy.
 wnNStrategy :: Eq f => NStrategy f
-wnNStrategy trs t
-  = let dts = defTrees trs
-        v = fromMaybe 0 (minVarInTRS trs)
-     in case loDefTrees dts t of
-          Nothing          -> []
-          (Just (_, []))   -> []
-          (Just (p, dt:_)) -> [(p .> q, r, sub) |
-                               (q, r, sub) <- wnNStrategy' dts v (t |> p) dt]
+wnNStrategy trs t =
+  let dts = defTrees trs
+      v = fromMaybe 0 (minVarInTRS trs)
+   in case loDefTrees dts t of
+        Nothing        -> []
+        Just (_, [])   -> []
+        Just (p, dt:_) -> [(p .> q, r, sub) |
+                           (q, r, sub) <- wnNStrategy' dts v (t |> p) dt]
 
 --- Returns the narrowing steps for the weakly needed narrowing strategy
 --- according to the given definitional tree and the given next possible
 --- variable.
 wnNStrategy' :: Eq f => [DefTree f] -> VarIdx -> Term f -> DefTree f
              -> [(Pos, Rule f, Subst f)]
-wnNStrategy' _   v t (Leaf r)
-  = let rule@(l, _) = renameRuleVars v (normalizeRule r)
-     in [(eps, rule, sub) | (Right sub) <- [unify [(t, l)]]]
-wnNStrategy' dts v t (Branch pat p dts')
-  = case selectDefTrees dts (t |> p) of
-      []     -> concatMap (wnNStrategy' dts v t) (filterDTS dts')
-      (dt:_) -> case unify [(t, renameTermVars v (normalizeTerm pat))] of
-                  (Left _)    -> []
-                  (Right tau) ->
-                    let tau' = restrictSubst tau (tVars t)
-                        t' = applySubst tau' t
-                        v' = max v (maybe 0 (+ 1) (maxVarInTerm t'))
-                     in [(p .> p', rule, composeSubst sub tau') |
-                         (p', rule, sub) <- wnNStrategy' dts v' (t' |> p) dt]
+wnNStrategy' _   v t (Leaf r) =
+  let rule@(l, _) = renameRuleVars v (normalizeRule r)
+   in [(eps, rule, sub) | Right sub <- [unify [(t, l)]]]
+wnNStrategy' dts v t (Branch pat p dts') =
+  case selectDefTrees dts (t |> p) of
+    []   -> concatMap (wnNStrategy' dts v t) (filterDTS dts')
+    dt:_ -> case unify [(t, renameTermVars v (normalizeTerm pat))] of
+              Left _    -> []
+              Right tau ->
+                let tau' = restrictSubst tau (tVars t)
+                    t' = applySubst tau' t
+                    v' = max v (maybe 0 (+ 1) (maxVarInTerm t'))
+                 in [(p .> p', rule, composeSubst sub tau') |
+                     (p', rule, sub) <- wnNStrategy' dts v' (t' |> p) dt]
   where
     filterDTS = filter (\dt -> let dtp = renameTermVars v (dtPattern dt)
                                 in unifiable [(t, dtp)])

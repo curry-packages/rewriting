@@ -7,8 +7,7 @@
 ---
 --- @author Michael Hanus, Jan-Hendrik Matthes, Jonas Oberschweiber,
 ---         Bjoern Peemoeller
---- @version August 2016
---- @category algorithm
+--- @version February 2020
 ------------------------------------------------------------------------------
 
 module Rewriting.UnificationSpec
@@ -55,16 +54,14 @@ showUnificationError s (OccurCheck v t) = "OccurCheck: " ++ (showVarIdx v)
 --- Unifies a list of term equations. Returns either a unification error or a
 --- substitution.
 unify :: (Eq f, Show f) => TermEqs f -> Either (UnificationError f) (Subst f)
-unify = (either Left (Right . eqsToSubst)) . (unify' [])
+unify = either Left (Right . eqsToSubst) . unify' []
   where
     eqsToSubst []              = emptySubst
-    eqsToSubst (eq@(l, r):eqs)
-      = case l of
-          (TermVar v)    -> extendSubst (eqsToSubst eqs) v r
-          (TermCons _ _) ->
-            case r of
-              (TermVar v)    -> extendSubst (eqsToSubst eqs) v l
-              (TermCons _ _) -> error ("eqsToSubst: " ++ (show eq))
+    eqsToSubst (eq@(l, r):eqs) = case l of
+      TermVar v    -> extendSubst (eqsToSubst eqs) v r
+      TermCons _ _ -> case r of
+        TermVar v    -> extendSubst (eqsToSubst eqs) v l
+        TermCons _ _ -> error ("unify.eqsToSubst: " ++ show eq)
 
 --- Checks whether a list of term equations can be unified.
 unifiable :: (Eq f, Show f) => TermEqs f -> Bool
@@ -81,7 +78,7 @@ unify' sub ((l@(TermCons _ _), TermVar v):eqs)              = elim sub v l eqs
 unify' sub ((TermVar v, r@(TermVar v')):eqs) | v == v'      = unify' sub eqs
                                              | otherwise    = elim sub v r eqs
 unify' sub ((l@(TermCons c1 ts1), r@(TermCons c2 ts2)):eqs)
-  | c1 == c2  = unify' sub ((zip ts1 ts2) ++ eqs)
+  | c1 == c2  = unify' sub (zip ts1 ts2 ++ eqs)
   | otherwise = Left (Clash l r)
 
 --- Substitutes a variable by a term inside a substitution and a list of term
@@ -92,7 +89,7 @@ elim :: Eq f => TermEqs f -> VarIdx -> Term f -> TermEqs f
 elim sub v t eqs | dependsOn (TermVar v) t = Left (OccurCheck v t)
                  | otherwise               = unify' sub' (substitute v t eqs)
   where
-    sub' = (TermVar v, t):(map (\(l, r) -> (l, termSubstitute v t r)) sub)
+    sub' = (TermVar v, t) : map (\(l, r) -> (l, termSubstitute v t r)) sub
 
 --- Substitutes a variable by a term inside another term.
 termSubstitute :: VarIdx -> Term f -> Term f -> Term f

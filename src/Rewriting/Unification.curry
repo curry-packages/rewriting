@@ -5,8 +5,7 @@
 ---
 --- @author Michael Hanus, Jan-Hendrik Matthes, Jonas Oberschweiber,
 ---         Bjoern Peemoeller
---- @version August 2016
---- @category algorithm
+--- @version February 2020
 ------------------------------------------------------------------------------
 
 module Rewriting.Unification
@@ -96,15 +95,13 @@ termToRTerm rt (TermCons c ts) = let (rt', ts') = mapAccumL termToRTerm rt ts
 --- ignored. Works on `RTerm`s, dereferences all `Ref`s.
 eqsToSubst :: RefTable f -> REqs f -> Subst f
 eqsToSubst _  []           = emptySubst
-eqsToSubst rt ((l, r):eqs)
-  = case l of
-      (Ref _)         -> eqsToSubst rt ((deref rt l, r):eqs)
-      (RTermVar v)    -> extendSubst (eqsToSubst rt eqs) v (rTermToTerm rt r)
-      (RTermCons _ _) ->
-        case r of
-          (Ref _)      -> eqsToSubst rt ((l, deref rt r):eqs)
-          (RTermVar v) -> extendSubst (eqsToSubst rt eqs) v (rTermToTerm rt l)
-          _            -> eqsToSubst rt eqs
+eqsToSubst rt ((l, r):eqs) = case l of
+  Ref _         -> eqsToSubst rt ((deref rt l, r):eqs)
+  RTermVar v    -> extendSubst (eqsToSubst rt eqs) v (rTermToTerm rt r)
+  RTermCons _ _ -> case r of
+    Ref _      -> eqsToSubst rt ((l, deref rt r):eqs)
+    RTermVar v -> extendSubst (eqsToSubst rt eqs) v (rTermToTerm rt l)
+    _          -> eqsToSubst rt eqs
 
 --- Converts an `RTerm` to a term by dereferencing all references inside the
 --- `RTerm`. The given reference table is used for reference lookups.
@@ -135,22 +132,21 @@ unify' :: Eq f => RefTable f -> REqs f -> REqs f
        -> Either (UnificationError f) (RefTable f, REqs f)
 -- No equations left, we are done.
 unify' rt sub []              = Right (rt, sub)
-unify' rt sub (eq@(l, r):eqs)
-  = case eq of
-      -- Substitute the variable by the constructor term.
-      (RTermVar v, RTermCons _ _)           -> elim rt sub v r eqs
-      (RTermCons _ _, RTermVar v)           -> elim rt sub v l eqs
-      -- If both variables are equal, simply remove the equation.
-      -- Otherwise substitute the first variable by the second variable.
-      (RTermVar v, RTermVar v') | v == v'   -> unify' rt sub eqs
-                                | otherwise -> elim rt sub v r eqs
-      -- If both constructors have the same name, equate their arguments.
-      -- Otherwise fail with a clash.
-      (RTermCons c1 ts1, RTermCons c2 ts2)
-        | c1 == c2  -> unify' rt sub ((zip ts1 ts2) ++ eqs)
-        | otherwise -> Left (Clash (rTermToTerm rt l) (rTermToTerm rt r))
-      -- If we encounter a Ref, simply dereference it and try again.
-      _ -> unify' rt sub ((deref rt l, deref rt r):eqs)
+unify' rt sub (eq@(l, r):eqs) = case eq of
+  -- Substitute the variable by the constructor term.
+  (RTermVar v, RTermCons _ _)           -> elim rt sub v r eqs
+  (RTermCons _ _, RTermVar v)           -> elim rt sub v l eqs
+  -- If both variables are equal, simply remove the equation.
+  -- Otherwise substitute the first variable by the second variable.
+  (RTermVar v, RTermVar v') | v == v'   -> unify' rt sub eqs
+                            | otherwise -> elim rt sub v r eqs
+  -- If both constructors have the same name, equate their arguments.
+  -- Otherwise fail with a clash.
+  (RTermCons c1 ts1, RTermCons c2 ts2)
+    | c1 == c2  -> unify' rt sub (zip ts1 ts2 ++ eqs)
+    | otherwise -> Left (Clash (rTermToTerm rt l) (rTermToTerm rt r))
+  -- If we encounter a `Ref`, simply dereference it and try again.
+  _ -> unify' rt sub ((deref rt l, deref rt r):eqs)
 
 --- Substitutes a variable by a term inside a list of equations that have
 --- yet to be unified and the right-hand sides of all equations of the result
@@ -171,8 +167,8 @@ elim rt sub v t eqs
 
 --- Checks whether the first term occurs as a subterm of the second term.
 dependsOn :: Eq f => RefTable f -> RTerm f -> RTerm f -> Bool
-dependsOn rt l r = (l /= r) && (dependsOn' r)
+dependsOn rt l r = l /= r && dependsOn' r
   where
-    dependsOn' x@(Ref _)        = (deref rt x) == l
+    dependsOn' x@(Ref _)        = deref rt x == l
     dependsOn' t@(RTermVar _)   = l == t
     dependsOn' (RTermCons _ ts) = or (map dependsOn' ts)
