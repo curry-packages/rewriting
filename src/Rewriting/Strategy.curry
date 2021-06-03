@@ -3,8 +3,7 @@
 --- terms and representation of reduction strategies.
 ---
 --- @author Jan-Hendrik Matthes
---- @version November 2016
---- @category algorithm
+--- @version February 2020
 ------------------------------------------------------------------------------
 
 module Rewriting.Strategy
@@ -15,7 +14,7 @@ module Rewriting.Strategy
   , reductionBy, reductionByL
   ) where
 
-import List (nub, intercalate, groupBy, sortBy, minimumBy)
+import Data.List (nub, intercalate, groupBy, sortBy, minimumBy)
 import Rewriting.Position
 import Rewriting.Rules (TRS, renameRuleVars, renameTRSVars)
 import Rewriting.Substitution (applySubst)
@@ -52,9 +51,9 @@ data Reduction f = NormalForm (Term f) | RStep (Term f) [Pos] (Reduction f)
 --- Transforms a reduction into a string representation.
 showReduction :: (f -> String) -> Reduction f -> String
 showReduction s (NormalForm t) = showTerm s t
-showReduction s (RStep t ps r) = (showTerm s t) ++ "\n\x2192" ++ "["
-                                   ++ (intercalate "," (map showPos ps))
-                                   ++ "] " ++ (showReduction s r)
+showReduction s (RStep t ps r) =
+  showTerm s t ++ "\n\x2192" ++ "[" ++ intercalate "," (map showPos ps) ++ "] "
+               ++ showReduction s r
 
 -- ---------------------------------------------------------------------------
 -- Functions for definition of reduction strategies
@@ -63,12 +62,12 @@ showReduction s (RStep t ps r) = (showTerm s t) ++ "\n\x2192" ++ "["
 --- Returns the redex positions of a term according to the given term
 --- rewriting system.
 redexes :: Eq f => TRS f -> Term f -> [Pos]
-redexes trs t
-  = let trs' = maybe trs (\v -> renameTRSVars (v + 1) trs) (maxVarInTerm t)
-     in nub [p | p <- positions t, let tp = t |> p,
-                 (l, _) <- trs',
-                 (Right sub) <- [unify [(l, tp)]],
-                 tp == (applySubst sub l)]
+redexes trs t =
+  let trs' = maybe trs (\v -> renameTRSVars (v + 1) trs) (maxVarInTerm t)
+   in nub [p | p <- positions t, let tp = t |> p,
+               (l, _) <- trs',
+               Right sub <- [unify [(l, tp)]],
+               tp == applySubst sub l]
 
 --- Returns a sequential reduction strategy according to the given ordering
 --- function.
@@ -131,7 +130,7 @@ roRStrategy = seqRStrategy roOrder
     roOrder p q | p == q      = EQ
                 | rightOf p q = LT
                 | above p q   = LT
-                | otherwise      = GT
+                | otherwise   = GT
 
 --- The parallel innermost reduction strategy.
 piRStrategy :: Eq f => RStrategy f
@@ -170,11 +169,10 @@ reduceL s trss = reduce s (concat trss)
 --- Reduces a term with the given strategy and term rewriting system by the
 --- given number of steps.
 reduceBy :: Eq f => RStrategy f -> TRS f -> Int -> Term f -> Term f
-reduceBy s trs n t
-  | n <= 0    = t
-  | otherwise = case s trs t of
-                  []       -> t
-                  ps@(_:_) -> reduceBy s trs (n - 1) (reduceAtL trs ps t)
+reduceBy s trs n t | n <= 0    = t
+                   | otherwise = case s trs t of
+  []       -> t
+  ps@(_:_) -> reduceBy s trs (n - 1) (reduceAtL trs ps t)
 
 --- Reduces a term with the given strategy and list of term rewriting systems
 --- by the given number of steps.
@@ -185,14 +183,13 @@ reduceByL s trss = reduceBy s (concat trss)
 --- position.
 reduceAt :: Eq f => TRS f -> Pos -> Term f -> Term f
 reduceAt []     _ t = t
-reduceAt (x:rs) p t
-  = case unify [(l, tp)] of
-      (Left _)                           -> reduceAt rs p t
-      (Right s) | tp == (applySubst s l) -> replaceTerm t p (applySubst s r)
-                | otherwise              -> reduceAt rs p t
-  where
-    tp = t |> p
-    (l, r) = maybe x (\v -> renameRuleVars (v + 1) x) (maxVarInTerm tp)
+reduceAt (x:rs) p t = case unify [(l, tp)] of
+  Left _                         -> reduceAt rs p t
+  Right s | tp == applySubst s l -> replaceTerm t p (applySubst s r)
+          | otherwise            -> reduceAt rs p t
+ where
+   tp = t |> p
+   (l, r) = maybe x (\v -> renameRuleVars (v + 1) x) (maxVarInTerm tp)
 
 --- Reduces a term with the given term rewriting system at the given redex
 --- positions.
@@ -203,10 +200,9 @@ reduceAtL trs (p:ps) t = reduceAtL trs ps (reduceAt trs p t)
 --- Returns the reduction of a term with the given strategy and term rewriting
 --- system.
 reduction :: Eq f => RStrategy f -> TRS f -> Term f -> Reduction f
-reduction s trs t
-  = case s trs t of
-      []       -> NormalForm t
-      ps@(_:_) -> RStep t ps (reduction s trs (reduceAtL trs ps t))
+reduction s trs t = case s trs t of
+  []       -> NormalForm t
+  ps@(_:_) -> RStep t ps (reduction s trs (reduceAtL trs ps t))
 
 --- Returns the reduction of a term with the given strategy and list of term
 --- rewriting systems.

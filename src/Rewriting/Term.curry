@@ -6,8 +6,7 @@
 --- also defines other structures, like term equations.
 ---
 --- @author Jan-Hendrik Matthes
---- @version November 2018
---- @category algorithm
+--- @version October 2020
 ------------------------------------------------------------------------------
 
 module Rewriting.Term
@@ -18,11 +17,9 @@ module Rewriting.Term
   , mapTerm, eqConsPattern
   ) where
 
-import Char      ( isAlphaNum )
-import List      ( nub, intercalate, maximum, minimum )
-import Maybe     ( fromMaybe )
-
-import Data.FiniteMap ( listToFM, lookupFM )
+import qualified Data.Map as Map
+import Data.List  (nub, intercalate, maximum, minimum)
+import Data.Maybe (fromMaybe)
 
 -- ---------------------------------------------------------------------------
 -- Representation of first-order terms and term equations
@@ -54,7 +51,7 @@ type TermEqs f = [TermEq f]
 
 --- Transforms a variable into a string representation.
 showVarIdx :: VarIdx -> String
-showVarIdx v | v >= 0    = if q == 0 then [c] else c:(show q)
+showVarIdx v | v >= 0    = if q == 0 then [c] else c : show q
              | otherwise = ""
   where
     (q, r) = divMod v 26
@@ -79,11 +76,11 @@ showTerm s = showTerm' False
 
 --- Transforms a term equation into a string representation.
 showTermEq :: (f -> String) -> TermEq f -> String
-showTermEq s (l, r) = (showTerm s l) ++ " = " ++ (showTerm s r)
+showTermEq s (l, r) = showTerm s l ++ " = " ++ showTerm s r
 
 --- Transforms a list of term equations into a string representation.
 showTermEqs :: (f -> String) -> TermEqs f -> String
-showTermEqs s = unlines . (map (showTermEq s))
+showTermEqs s = unlines . map (showTermEq s)
 
 -- ---------------------------------------------------------------------------
 -- Functions for first-order terms
@@ -111,7 +108,7 @@ tCons = nub . tConsAll
 --- contain duplicates.
 tConsAll :: Term f -> [f]
 tConsAll (TermVar _)     = []
-tConsAll (TermCons c ts) = c:(concatMap tConsAll ts)
+tConsAll (TermCons c ts) = c : concatMap tConsAll ts
 
 --- Returns a list without duplicates of all variables in a term.
 tVars :: Term _ -> [VarIdx]
@@ -144,10 +141,9 @@ isLinear = unique . tVarsAll
 isNormal :: Term _ -> Bool
 isNormal (TermVar _)         = True
 isNormal (TermCons _ [])     = True
-isNormal (TermCons c (t:ts))
-  = case t of
-      (TermVar _)    -> all isVarTerm ts
-      (TermCons _ _) -> (isNormal t) && (isNormal (TermCons c ts))
+isNormal (TermCons c (t:ts)) = case t of
+  TermVar _    -> all isVarTerm ts
+  TermCons _ _ -> isNormal t && isNormal (TermCons c ts)
 
 --- Returns the maximum variable in a term or `Nothing` if no variable exists.
 maxVarInTerm :: Term _ -> Maybe VarIdx
@@ -166,9 +162,9 @@ minVarInTerm t = case tVars t of
 normalizeTerm :: Term f -> Term f
 normalizeTerm t = normalize t
   where
-    sub = listToFM (<) (zip (tVars t) (map TermVar [0..]))
+    sub = Map.fromList (zip (tVars t) (map TermVar [0..]))
 
-    normalize t'@(TermVar v)  = fromMaybe t' (lookupFM sub v)
+    normalize t'@(TermVar v)  = fromMaybe t' (Map.lookup v sub)
     normalize (TermCons c ts) = TermCons c (map normalize ts)
 
 --- Renames the variables in a term by the given number.
@@ -194,7 +190,7 @@ eqConsPattern (TermCons c1 ts1) (TermCons c2 ts2) =
 -- Definition of helper functions
 -- ---------------------------------------------------------------------------
 
---- Encloses a string in parenthesis if the given condition is true.
+--- Encloses a string in parentheses if the given condition is true.
 parensIf :: Bool -> String -> String
 parensIf b s = if b then "(" ++ s ++ ")" else s
 

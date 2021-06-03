@@ -2,8 +2,7 @@
 --- Library for representation of positions in first-order terms.
 ---
 --- @author Jan-Hendrik Matthes
---- @version November 2016
---- @category algorithm
+--- @version February 2020
 ------------------------------------------------------------------------------
 
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
@@ -14,7 +13,7 @@ module Rewriting.Position
   , positions, (.>), (|>), replaceTerm
   ) where
 
-import List (intercalate, isPrefixOf)
+import Data.List (intercalate, isPrefixOf)
 import Rewriting.Term (Term (..))
 
 -- ---------------------------------------------------------------------------
@@ -67,7 +66,7 @@ rightOf = flip leftOf
 
 --- Checks whether two positions are disjoint.
 disjoint :: Pos -> Pos -> Bool
-disjoint p q = not ((above p q) || (below p q))
+disjoint p q = not (above p q || below p q)
 
 --- Returns a list of all positions in a term.
 positions :: Term _ -> [Pos]
@@ -86,8 +85,9 @@ positions (TermCons _ ts) = eps:[i:p | (i, t) <- zip [1..] ts,
 --- Returns the subterm of a term at the given position if the position exists
 --- within the term.
 (|>) :: Term f -> Pos -> Term f
-t               |> []    = t
-(TermCons _ ts) |> (i:p) = (ts !! (i - 1)) |> p
+t             |> []    = t
+TermCons _ ts |> (i:p) = (ts !! (i - 1)) |> p
+TermVar _     |> (_:_) = error "(|>): A term variable has no subterms!"
 
 --- Replaces the subterm of a term at the given position with the given term
 --- if the position exists within the term.
@@ -95,8 +95,8 @@ replaceTerm :: Term f -> Pos -> Term f -> Term f
 replaceTerm _                 []    s = s
 replaceTerm t@(TermVar _)     (_:_) _ = t
 replaceTerm t@(TermCons c ts) (i:p) s
-  | (i > 0) && (i <= (length ts))     = TermCons c ts'
+  | i > 0 && i <= length ts           = TermCons c ts'
   | otherwise                         = t
   where
     (ts1, ti:ts2) = splitAt (i - 1) ts
-    ts' = ts1 ++ ((replaceTerm ti p s):ts2)
+    ts' = ts1 ++ (replaceTerm ti p s : ts2)

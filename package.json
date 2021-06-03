@@ -1,26 +1,28 @@
 {
     "name": "rewriting",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "author": "Jan-Hendrik Matthes, Michael Hanus <mh@informatik.uni-kiel.de>",
     "maintainer": "Michael Hanus <mh@informatik.uni-kiel.de>",
     "synopsis": "Libraries for term rewriting and narrowing",
     "description":
-      "These libraries provide a representation of first-order terms
+      "This package provides a representation of first-order terms
        and various notions of term rewriting, like position, substitution,
        unification, critical pairs, etc. Moreover, it defines also
        operations for rewriting and narrowing strategies and a
        representation of definitional trees.
-       A previous version of these libraries were part of the
+       A previous version of the contained libraries was part of the
        PAKCS/KiCS2 distributions.",
     "category": [ "Rewriting", "Narrowing" ],
+    "homepage": "https://github.com/matthesjh/rewriting-curry",
+    "repository": "https://github.com/matthesjh/rewriting-curry.git",
+    "bugReports": "https://github.com/matthesjh/rewriting-curry/issues",
+    "license": "BSD-3-Clause",
+    "licenseFile": "LICENSE.md",
     "dependencies": {
-        "base"          : ">= 1.0.0, < 2.0.0",
-        "abstract-curry": ">= 2.0.0",
-        "finite-map"    : ">= 0.0.1"
-    },
-    "compilerCompatibility": {
-        "pakcs": ">= 2.0.0",
-        "kics2": ">= 2.0.0"
+        "base"          : ">= 3.0.0, < 4.0.0",
+        "abstract-curry": ">= 3.0.0, < 4.0.0",
+        "containers"    : ">= 3.0.0, < 4.0.0",
+        "transformers"  : ">= 3.0.0, < 4.0.0"
     },
     "exportedModules": [
         "Rewriting.CriticalPairs", "Rewriting.Narrowing", "Rewriting.Strategy",

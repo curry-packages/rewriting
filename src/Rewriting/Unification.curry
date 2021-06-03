@@ -5,8 +5,7 @@
 ---
 --- @author Michael Hanus, Jan-Hendrik Matthes, Jonas Oberschweiber,
 ---         Bjoern Peemoeller
---- @version August 2016
---- @category algorithm
+--- @version February 2020
 ------------------------------------------------------------------------------
 
 module Rewriting.Unification
@@ -14,10 +13,9 @@ module Rewriting.Unification
   , showUnificationError, unify, unifiable
   ) where
 
-import Either (isRight)
-import List (mapAccumL)
-
-import Data.FiniteMap (FM, emptyFM, addToFM, lookupFM)
+import Data.Either (isRight)
+import Data.List   (mapAccumL)
+import qualified Data.Map as Map
 import Rewriting.Substitution (Subst, emptySubst, extendSubst)
 import Rewriting.Term (VarIdx, Term (..), TermEq, TermEqs)
 import Rewriting.UnificationSpec (UnificationError (..), showUnificationError)
@@ -37,7 +35,7 @@ data RTerm f = Ref VarIdx | RTermVar VarIdx | RTermCons f [RTerm f]
 --- A reference table used to store the values referenced by `Ref` terms
 --- represented as a finite map from variables to `RTerm`s and parameterized
 --- over the kind of function symbols, e.g., strings.
-type RefTable f = FM VarIdx (RTerm f)
+type RefTable f = Map.Map VarIdx (RTerm f)
 
 --- An `RTerm` equation represented as a pair of `RTerm`s and parameterized
 --- over the kind of function symbols, e.g., strings.
@@ -70,7 +68,7 @@ unifiable = isRight . unify
 --- Converts a list of term equations into a list of `RTerm` equations and
 --- places references into a fresh reference table.
 termEqsToREqs :: TermEqs f -> (RefTable f, REqs f)
-termEqsToREqs = mapAccumL termEqToREq (emptyFM (<))
+termEqsToREqs = mapAccumL termEqToREq Map.empty
 
 --- Converts a term equation into an `RTerm` equation. The given reference
 --- table is used to store references.
@@ -83,7 +81,7 @@ termEqToREq rt (l, r) = let (rt1, l') = termToRTerm rt l
 --- reference table and replacing them by references inside the result
 --- `RTerm`.
 termToRTerm :: RefTable f -> Term f -> (RefTable f, RTerm f)
-termToRTerm rt (TermVar v)     = (addToFM rt v (RTermVar v), Ref v)
+termToRTerm rt (TermVar v)     = (Map.insert v (RTermVar v) rt, Ref v)
 termToRTerm rt (TermCons c ts) = let (rt', ts') = mapAccumL termToRTerm rt ts
                                   in (rt', RTermCons c ts')
 
@@ -97,15 +95,13 @@ termToRTerm rt (TermCons c ts) = let (rt', ts') = mapAccumL termToRTerm rt ts
 --- ignored. Works on `RTerm`s, dereferences all `Ref`s.
 eqsToSubst :: RefTable f -> REqs f -> Subst f
 eqsToSubst _  []           = emptySubst
-eqsToSubst rt ((l, r):eqs)
-  = case l of
-      (Ref _)         -> eqsToSubst rt ((deref rt l, r):eqs)
-      (RTermVar v)    -> extendSubst (eqsToSubst rt eqs) v (rTermToTerm rt r)
-      (RTermCons _ _) ->
-        case r of
-          (Ref _)      -> eqsToSubst rt ((l, deref rt r):eqs)
-          (RTermVar v) -> extendSubst (eqsToSubst rt eqs) v (rTermToTerm rt l)
-          _            -> eqsToSubst rt eqs
+eqsToSubst rt ((l, r):eqs) = case l of
+  Ref _         -> eqsToSubst rt ((deref rt l, r):eqs)
+  RTermVar v    -> extendSubst (eqsToSubst rt eqs) v (rTermToTerm rt r)
+  RTermCons _ _ -> case r of
+    Ref _      -> eqsToSubst rt ((l, deref rt r):eqs)
+    RTermVar v -> extendSubst (eqsToSubst rt eqs) v (rTermToTerm rt l)
+    _          -> eqsToSubst rt eqs
 
 --- Converts an `RTerm` to a term by dereferencing all references inside the
 --- `RTerm`. The given reference table is used for reference lookups.
@@ -118,7 +114,7 @@ rTermToTerm rt (RTermCons c ts) = TermCons c (map (rTermToTerm rt) ts)
 --- the same value for `RTermVar` and `RTermCons`. The given reference table
 --- is used for reference lookups.
 deref :: RefTable f -> RTerm f -> RTerm f
-deref rt (Ref i)           = case lookupFM rt i of
+deref rt (Ref i)           = case Map.lookup i rt of
                                Nothing  -> error ("deref: " ++ (show i))
                                (Just t) -> case t of
                                              (Ref _)         -> deref rt t
@@ -136,22 +132,21 @@ unify' :: Eq f => RefTable f -> REqs f -> REqs f
        -> Either (UnificationError f) (RefTable f, REqs f)
 -- No equations left, we are done.
 unify' rt sub []              = Right (rt, sub)
-unify' rt sub (eq@(l, r):eqs)
-  = case eq of
-      -- Substitute the variable by the constructor term.
-      (RTermVar v, RTermCons _ _)           -> elim rt sub v r eqs
-      (RTermCons _ _, RTermVar v)           -> elim rt sub v l eqs
-      -- If both variables are equal, simply remove the equation.
-      -- Otherwise substitute the first variable by the second variable.
-      (RTermVar v, RTermVar v') | v == v'   -> unify' rt sub eqs
-                                | otherwise -> elim rt sub v r eqs
-      -- If both constructors have the same name, equate their arguments.
-      -- Otherwise fail with a clash.
-      (RTermCons c1 ts1, RTermCons c2 ts2)
-        | c1 == c2  -> unify' rt sub ((zip ts1 ts2) ++ eqs)
-        | otherwise -> Left (Clash (rTermToTerm rt l) (rTermToTerm rt r))
-      -- If we encounter a Ref, simply dereference it and try again.
-      _ -> unify' rt sub ((deref rt l, deref rt r):eqs)
+unify' rt sub (eq@(l, r):eqs) = case eq of
+  -- Substitute the variable by the constructor term.
+  (RTermVar v, RTermCons _ _)           -> elim rt sub v r eqs
+  (RTermCons _ _, RTermVar v)           -> elim rt sub v l eqs
+  -- If both variables are equal, simply remove the equation.
+  -- Otherwise substitute the first variable by the second variable.
+  (RTermVar v, RTermVar v') | v == v'   -> unify' rt sub eqs
+                            | otherwise -> elim rt sub v r eqs
+  -- If both constructors have the same name, equate their arguments.
+  -- Otherwise fail with a clash.
+  (RTermCons c1 ts1, RTermCons c2 ts2)
+    | c1 == c2  -> unify' rt sub (zip ts1 ts2 ++ eqs)
+    | otherwise -> Left (Clash (rTermToTerm rt l) (rTermToTerm rt r))
+  -- If we encounter a `Ref`, simply dereference it and try again.
+  _ -> unify' rt sub ((deref rt l, deref rt r):eqs)
 
 --- Substitutes a variable by a term inside a list of equations that have
 --- yet to be unified and the right-hand sides of all equations of the result
@@ -166,14 +161,14 @@ elim rt sub v t eqs
         (Ref _)         -> error "elim"
         -- Make sure to place a Ref in the reference table and substitution,
         -- not the RTermVar itself.
-        (RTermVar v')   -> let rt' = addToFM rt v (Ref v')
+        (RTermVar v')   -> let rt' = Map.insert v (Ref v') rt
                             in unify' rt' ((RTermVar v, Ref v'):sub) eqs
-        (RTermCons _ _) -> unify' (addToFM rt v t) ((RTermVar v, t):sub) eqs
+        (RTermCons _ _) -> unify' (Map.insert v t rt) ((RTermVar v, t):sub) eqs
 
 --- Checks whether the first term occurs as a subterm of the second term.
 dependsOn :: Eq f => RefTable f -> RTerm f -> RTerm f -> Bool
-dependsOn rt l r = (l /= r) && (dependsOn' r)
+dependsOn rt l r = l /= r && dependsOn' r
   where
-    dependsOn' x@(Ref _)        = (deref rt x) == l
+    dependsOn' x@(Ref _)        = deref rt x == l
     dependsOn' t@(RTermVar _)   = l == t
     dependsOn' (RTermCons _ ts) = or (map dependsOn' ts)
